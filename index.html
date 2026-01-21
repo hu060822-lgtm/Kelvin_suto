@@ -3,37 +3,167 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>喀爾文素頭防禦戰 v2.0</title>
+    <title>喀爾文：全方位素頭防線</title>
     <style>
-        body {
-            margin: 0;
-            overflow: hidden;
-            background-color: #1a1a1a;
-            font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            color: white;
-            touch-action: manipulation;
-        }
-        #game-ui {
+        body { margin: 0; overflow: hidden; background-color: #111; font-family: sans-serif; touch-action: manipulation; }
+        #game-stage { position: relative; width: 100vw; height: 100vh; background: radial-gradient(circle, #333 0%, #000 70%); overflow: hidden; }
+        
+        /* 中央安全區 */
+        #safe-zone {
             position: absolute;
-            top: 5%;
-            text-align: center;
-            z-index: 10;
+            top: 50%; left: 50%;
+            width: 80px; height: 80px;
+            margin: -40px 0 0 -40px;
+            background: #f1c40f;
+            border-radius: 50%;
+            box-shadow: 0 0 20px #f1c40f;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: bold; color: black; font-size: 12px; z-index: 10;
         }
-        #game-container {
-            position: relative;
-            width: 85vw;
-            max-width: 350px;
-            height: 85vw;
-            max-height: 350px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+
+        /* 敵人樣式 */
+        .calvin-enemy {
+            position: absolute;
+            width: 70px; height: 70px;
+            border-radius: 50%;
+            border: 2px solid white;
+            background-size: cover;
+            background-position: center;
+            z-index: 5;
+            transition: transform 0.1s;
         }
+
+        /* UI 層 */
+        .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; color: white; text-align: center; }
+        #score-ui { position: absolute; top: 20px; width: 100%; text-align: center; color: white; font-size: 24px; font-weight: bold; z-index: 20; }
+        .btn { padding: 15px 40px; background: #e74c3c; color: white; border: none; border-radius: 30px; font-size: 18px; margin-top: 20px; }
+    </style>
+</head>
+<body>
+
+    <div id="game-stage">
+        <div id="score-ui">防禦次數: 0</div>
+        <div id="safe-zone">安全區</div>
+    </div>
+
+    <div id="start-ui" class="overlay">
+        <h2>喀爾文全方位突襲</h2>
+        <p>喀爾文正從四周走過來想「素」你！</p>
+        <p style="color: #f1c40f;">點擊喀爾文將他們擊退</p>
+        <button class="btn" onclick="startGame()">開始防禦</button>
+    </div>
+
+    <div id="end-ui" class="overlay" style="display:none">
+        <h1 style="color:#ff4757; font-size: 40px;">防線崩潰！</h1>
+        <p style="font-size: 20px;">你終究還是被素頭了...</p>
+        <p id="final-score" style="font-size: 24px; color:#f1c40f;"></p>
+        <button class="btn" onclick="location.reload()">不服再戰</button>
+    </div>
+
+    <script>
+        const stage = document.getElementById('game-stage');
+        const scoreUI = document.getElementById('score-ui');
+        let score = 0;
+        let isGameOver = false;
+        let spawnRate = 1500; // 生成速度（毫秒）
+        let enemySpeed = 1.5; // 移動速度
+
+        function startGame() {
+            document.getElementById('start-ui').style.display = 'none';
+            spawnLoop();
+        }
+
+        function createEnemy() {
+            if (isGameOver) return;
+
+            const enemy = document.createElement('div');
+            enemy.className = 'calvin-enemy';
+            enemy.style.backgroundImage = "url('12672.jpg')";
+            
+            // 隨機從四個邊界出生
+            let x, y;
+            const side = Math.floor(Math.random() * 4);
+            if (side === 0) { x = Math.random() * window.innerWidth; y = -70; } // 上
+            else if (side === 1) { x = window.innerWidth + 70; y = Math.random() * window.innerHeight; } // 右
+            else if (side === 2) { x = Math.random() * window.innerWidth; y = window.innerHeight + 70; } // 下
+            else { x = -70; y = Math.random() * window.innerHeight; } // 左
+
+            enemy.dataset.x = x;
+            enemy.dataset.y = y;
+            updatePosition(enemy);
+
+            // 點擊防禦邏輯
+            enemy.addEventListener('touchstart', (e) => repel(enemy, e));
+            enemy.addEventListener('mousedown', (e) => repel(enemy, e));
+
+            stage.appendChild(enemy);
+            moveEnemy(enemy);
+        }
+
+        function moveEnemy(enemy) {
+            const moveInterval = setInterval(() => {
+                if (isGameOver) { clearInterval(moveInterval); return; }
+
+                const targetX = window.innerWidth / 2 - 35;
+                const targetY = window.innerHeight / 2 - 35;
+                const dx = targetX - parseFloat(enemy.dataset.x);
+                const dy = targetY - parseFloat(enemy.dataset.y);
+                const dist = Math.sqrt(dx * dx + dy * dy);
+
+                if (dist < 40) {
+                    gameOver();
+                    clearInterval(moveInterval);
+                } else {
+                    const vx = (dx / dist) * enemySpeed;
+                    const vy = (dy / dist) * enemySpeed;
+                    enemy.dataset.x = parseFloat(enemy.dataset.x) + vx;
+                    enemy.dataset.y = parseFloat(enemy.dataset.y) + vy;
+                    updatePosition(enemy);
+                }
+            }, 20);
+        }
+
+        function updatePosition(el) {
+            el.style.left = el.dataset.x + 'px';
+            el.style.top = el.dataset.y + 'px';
+        }
+
+        function repel(enemy, e) {
+            e.stopPropagation();
+            if (isGameOver) return;
+            
+            score++;
+            scoreUI.innerText = `防禦次數: ${score}`;
+            
+            // 擊退效果：變大並淡出
+            enemy.style.transform = "scale(1.5)";
+            enemy.style.opacity = "0";
+            setTimeout(() => {
+                if (enemy.parentNode) stage.removeChild(enemy);
+            }, 100);
+
+            // 增加難度
+            if (score % 5 === 0) {
+                enemySpeed += 0.2;
+                spawnRate = Math.max(500, spawnRate - 50);
+            }
+        }
+
+        function spawnLoop() {
+            if (isGameOver) return;
+            createEnemy();
+            setTimeout(spawnLoop, spawnRate);
+        }
+
+        function gameOver() {
+            isGameOver = true;
+            document.getElementById('end-ui').style.display = 'flex';
+            document.getElementById('final-score').innerText = `你成功防禦了 ${score} 次攻擊`;
+            stage.style.filter = "grayscale(1) sepia(1) hue-rotate(-50deg)";
+        }
+    </script>
+</body>
+</html>
         #calvin-img {
             width: 100%;
             height: 100%;
