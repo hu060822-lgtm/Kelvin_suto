@@ -3,74 +3,105 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>喀爾文：全方位素頭防線</title>
+    <title>喀爾文：全方位素頭防線 v3.0</title>
     <style>
-        body { margin: 0; overflow: hidden; background-color: #111; font-family: sans-serif; touch-action: manipulation; }
-        #game-stage { position: relative; width: 100vw; height: 100vh; background: radial-gradient(circle, #333 0%, #000 70%); overflow: hidden; }
+        body { margin: 0; overflow: hidden; background-color: #000; font-family: sans-serif; touch-action: manipulation; }
+        #game-stage { position: relative; width: 100vw; height: 100vh; background: radial-gradient(circle, #222 0%, #000 80%); overflow: hidden; }
         
         /* 中央安全區 */
         #safe-zone {
             position: absolute;
             top: 50%; left: 50%;
-            width: 80px; height: 80px;
-            margin: -40px 0 0 -40px;
+            width: 70px; height: 70px;
+            margin: -35px 0 0 -35px;
             background: #f1c40f;
             border-radius: 50%;
-            box-shadow: 0 0 20px #f1c40f;
+            box-shadow: 0 0 30px #f1c40f;
             display: flex; align-items: center; justify-content: center;
-            font-weight: bold; color: black; font-size: 12px; z-index: 10;
+            font-weight: bold; color: black; font-size: 14px; z-index: 10;
         }
 
-        /* 敵人樣式 */
         .calvin-enemy {
             position: absolute;
-            width: 70px; height: 70px;
+            width: 65px; height: 65px;
             border-radius: 50%;
-            border: 2px solid white;
+            border: 2px solid #fff;
             background-size: cover;
             background-position: center;
             z-index: 5;
-            transition: transform 0.1s;
+            pointer-events: auto; /* 確保可以點擊 */
         }
 
         /* UI 層 */
-        .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; color: white; text-align: center; }
-        #score-ui { position: absolute; top: 20px; width: 100%; text-align: center; color: white; font-size: 24px; font-weight: bold; z-index: 20; }
-        .btn { padding: 15px 40px; background: #e74c3c; color: white; border: none; border-radius: 30px; font-size: 18px; margin-top: 20px; }
+        .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; color: white; text-align: center; padding: 20px; box-sizing: border-box; }
+        #info-ui { position: absolute; top: 20px; width: 100%; text-align: center; color: white; z-index: 20; }
+        #score-text { font-size: 24px; font-weight: bold; }
+        #timer-text { font-size: 16px; color: #aaa; }
+        
+        .btn { padding: 15px 50px; background: #e74c3c; color: white; border: none; border-radius: 50px; font-size: 20px; font-weight: bold; margin-top: 20px; box-shadow: 0 5px 15px rgba(231,76,60,0.4); }
+        .mode-hint { color: #ff4757; font-weight: bold; margin-top: 10px; display: none; animation: flash 1s infinite; }
+        @keyframes flash { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
     </style>
 </head>
 <body>
 
     <div id="game-stage">
-        <div id="score-ui">防禦次數: 0</div>
-        <div id="safe-zone">安全區</div>
+        <div id="info-ui">
+            <div id="score-text">防禦次數: 0</div>
+            <div id="timer-text">生存時間: 0s</div>
+            <div id="mode-hint" class="mode-hint">⚠️ 偵測到不規則移動！</div>
+        </div>
+        <div id="safe-zone">核心</div>
     </div>
 
     <div id="start-ui" class="overlay">
-        <h2>喀爾文全方位突襲</h2>
-        <p>喀爾文正從四周走過來想「素」你！</p>
-        <p style="color: #f1c40f;">點擊喀爾文將他們擊退</p>
-        <button class="btn" onclick="startGame()">開始防禦</button>
+        <h1 style="color:#f1c40f">核心保衛戰</h1>
+        <div style="text-align: left; background: #222; padding: 20px; border-radius: 15px; line-height: 1.6;">
+            <p>1. 喀爾文會從四周試圖進入核心。</p>
+            <p>2. <b>點擊喀爾文</b> 將他們擊退。</p>
+            <p>3. 隨時間推移，他們會<b>跑得更快</b>。</p>
+            <p>4. 40秒後，將進入<b>不規則移動模式</b>！</p>
+        </div>
+        <button class="btn" onclick="realStartGame()">我知道了，開始！</button>
     </div>
 
     <div id="end-ui" class="overlay" style="display:none">
-        <h1 style="color:#ff4757; font-size: 40px;">防線崩潰！</h1>
-        <p style="font-size: 20px;">你終究還是被素頭了...</p>
-        <p id="final-score" style="font-size: 24px; color:#f1c40f;"></p>
-        <button class="btn" onclick="location.reload()">不服再戰</button>
+        <h1 style="color:#ff4757; font-size: 40px;">你被素頭了！</h1>
+        <p id="final-stat" style="font-size: 20px;"></p>
+        <button class="btn" onclick="location.reload()">重新啟動防線</button>
     </div>
 
     <script>
         const stage = document.getElementById('game-stage');
-        const scoreUI = document.getElementById('score-ui');
         let score = 0;
         let isGameOver = false;
-        let spawnRate = 1500; // 生成速度（毫秒）
-        let enemySpeed = 1.5; // 移動速度
+        let startTime = 0;
+        let baseSpeed = 1.2;
+        let spawnRate = 1200;
 
-        function startGame() {
+        // 修改後的開始函數，確保 UI 關閉
+        function realStartGame() {
             document.getElementById('start-ui').style.display = 'none';
+            startTime = Date.now();
+            isGameOver = false;
+            updateTimer();
             spawnLoop();
+        }
+
+        function updateTimer() {
+            if (isGameOver) return;
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            document.getElementById('timer-text').innerText = `生存時間: ${elapsed}s`;
+            
+            // 每 5 秒提升基礎速度
+            baseSpeed = 1.2 + (elapsed / 5) * 0.3;
+            // 縮短生成間隔
+            spawnRate = Math.max(400, 1200 - (elapsed * 10));
+
+            if (elapsed >= 40) {
+                document.getElementById('mode-hint').style.display = 'block';
+            }
+            setTimeout(updateTimer, 1000);
         }
 
         function createEnemy() {
@@ -80,73 +111,89 @@
             enemy.className = 'calvin-enemy';
             enemy.style.backgroundImage = "url('12672.jpg')";
             
-            // 隨機從四個邊界出生
+            // 隨機出生位置
             let x, y;
             const side = Math.floor(Math.random() * 4);
-            if (side === 0) { x = Math.random() * window.innerWidth; y = -70; } // 上
-            else if (side === 1) { x = window.innerWidth + 70; y = Math.random() * window.innerHeight; } // 右
-            else if (side === 2) { x = Math.random() * window.innerWidth; y = window.innerHeight + 70; } // 下
-            else { x = -70; y = Math.random() * window.innerHeight; } // 左
+            if (side === 0) { x = Math.random() * window.innerWidth; y = -70; }
+            else if (side === 1) { x = window.innerWidth + 70; y = Math.random() * window.innerHeight; }
+            else if (side === 2) { x = Math.random() * window.innerWidth; y = window.innerHeight + 70; }
+            else { x = -70; y = Math.random() * window.innerHeight; }
 
             enemy.dataset.x = x;
             enemy.dataset.y = y;
-            updatePosition(enemy);
-
-            // 點擊防禦邏輯
-            enemy.addEventListener('touchstart', (e) => repel(enemy, e));
-            enemy.addEventListener('mousedown', (e) => repel(enemy, e));
+            enemy.dataset.seed = Math.random() * 100; // 隨機種子用於不規則移動
+            
+            // 點擊事件 (支援手機觸控)
+            const handleHit = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                repel(enemy);
+            };
+            enemy.addEventListener('touchstart', handleHit, {passive: false});
+            enemy.addEventListener('mousedown', handleHit);
 
             stage.appendChild(enemy);
             moveEnemy(enemy);
         }
 
         function moveEnemy(enemy) {
+            let internalTime = 0;
             const moveInterval = setInterval(() => {
                 if (isGameOver) { clearInterval(moveInterval); return; }
+                if (!enemy.parentNode) { clearInterval(moveInterval); return; }
 
-                const targetX = window.innerWidth / 2 - 35;
-                const targetY = window.innerHeight / 2 - 35;
-                const dx = targetX - parseFloat(enemy.dataset.x);
-                const dy = targetY - parseFloat(enemy.dataset.y);
+                const elapsed = (Date.now() - startTime) / 1000;
+                const targetX = window.innerWidth / 2 - 32;
+                const targetY = window.innerHeight / 2 - 32;
+                
+                let curX = parseFloat(enemy.dataset.x);
+                let curY = parseFloat(enemy.dataset.y);
+                
+                const dx = targetX - curX;
+                const dy = targetY - curY;
                 const dist = Math.sqrt(dx * dx + dy * dy);
 
-                if (dist < 40) {
+                if (dist < 35) {
                     gameOver();
                     clearInterval(moveInterval);
-                } else {
-                    const vx = (dx / dist) * enemySpeed;
-                    const vy = (dy / dist) * enemySpeed;
-                    enemy.dataset.x = parseFloat(enemy.dataset.x) + vx;
-                    enemy.dataset.y = parseFloat(enemy.dataset.y) + vy;
-                    updatePosition(enemy);
+                    return;
                 }
+
+                // 基礎向量
+                let vx = (dx / dist) * baseSpeed;
+                let vy = (dy / dist) * baseSpeed;
+
+                // 40秒後的不規則移動邏輯
+                if (elapsed > 40) {
+                    const wave = Math.sin(internalTime * 0.1 + enemy.dataset.seed) * 3; // 左右晃動強度
+                    // 計算垂直於前進方向的向量
+                    const perpX = -(dy / dist) * wave;
+                    const perpY = (dx / dist) * wave;
+                    vx += perpX;
+                    vy += perpY;
+                }
+
+                enemy.dataset.x = curX + vx;
+                enemy.dataset.y = curY + vy;
+                
+                enemy.style.left = enemy.dataset.x + 'px';
+                enemy.style.top = enemy.dataset.y + 'px';
+                internalTime++;
             }, 20);
         }
 
-        function updatePosition(el) {
-            el.style.left = el.dataset.x + 'px';
-            el.style.top = el.dataset.y + 'px';
-        }
-
-        function repel(enemy, e) {
-            e.stopPropagation();
+        function repel(enemy) {
             if (isGameOver) return;
-            
             score++;
-            scoreUI.innerText = `防禦次數: ${score}`;
+            document.getElementById('score-text').innerText = `防禦次數: ${score}`;
             
-            // 擊退效果：變大並淡出
-            enemy.style.transform = "scale(1.5)";
+            // 擊退動畫
+            enemy.style.transform = "scale(1.8)";
             enemy.style.opacity = "0";
+            enemy.style.transition = "all 0.2s";
             setTimeout(() => {
                 if (enemy.parentNode) stage.removeChild(enemy);
-            }, 100);
-
-            // 增加難度
-            if (score % 5 === 0) {
-                enemySpeed += 0.2;
-                spawnRate = Math.max(500, spawnRate - 50);
-            }
+            }, 200);
         }
 
         function spawnLoop() {
@@ -156,277 +203,13 @@
         }
 
         function gameOver() {
+            if (isGameOver) return;
             isGameOver = true;
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
             document.getElementById('end-ui').style.display = 'flex';
-            document.getElementById('final-score').innerText = `你成功防禦了 ${score} 次攻擊`;
-            stage.style.filter = "grayscale(1) sepia(1) hue-rotate(-50deg)";
+            document.getElementById('final-stat').innerText = `防禦了 ${score} 次，堅持了 ${elapsed} 秒`;
+            stage.style.filter = "invert(1) hue-rotate(180deg)";
         }
-    </script>
-</body>
-</html>
-        #calvin-img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            border-radius: 50%;
-            border: 5px solid #444;
-            box-shadow: 0 0 30px rgba(0,0,0,0.5);
-            transition: filter 0.1s;
-        }
-        /* 攻擊預警區域 */
-        #danger-zone {
-            position: absolute;
-            bottom: -10px;
-            width: 120px;
-            height: 20px;
-            background: linear-gradient(transparent, red);
-            opacity: 0.6;
-            border-radius: 50%;
-            filter: blur(5px);
-        }
-        /* 教學與結束畫面彈窗 */
-        .overlay {
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.85);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            z-index: 100;
-            padding: 20px;
-            text-align: center;
-        }
-        .btn {
-            padding: 15px 40px;
-            background: #e74c3c;
-            color: white;
-            border: none;
-            border-radius: 30px;
-            font-size: 20px;
-            font-weight: bold;
-            margin-top: 20px;
-            box-shadow: 0 4px 10px rgba(231, 76, 60, 0.4);
-        }
-        .instruction {
-            line-height: 1.6;
-            color: #ddd;
-            margin-bottom: 20px;
-        }
-        #score-board { font-size: 28px; font-weight: bold; color: #f1c40f; }
-    </style>
-</head>
-<body onclick="handleDefense()">
-
-    <div id="game-ui">
-        <div id="score-board">分數: 0</div>
-    </div>
-
-    <div id="game-container">
-        <img id="calvin-img" src="12672.jpg" alt="Calvin">
-        <div id="danger-zone"></div>
-    </div>
-
-    <div id="guide-overlay" class="overlay">
-        <h2>如何防禦「素頭」？</h2>
-        <div class="instruction">
-            <p>1. 喀爾文會不斷旋轉尋找機會攻擊。</p>
-            <p>2. 當他的<b>頭部指向正下方</b>（紅色區域）時...<br><b style="color:#ff4757">你就被素頭了！</b></p>
-            <p>3. <b>操作：</b>在被素頭前，點擊螢幕任何地方<br>將他的頭部「撥開」。</p>
-        </div>
-        <button class="btn" onclick="startGame(event)">我準備好了</button>
-    </div>
-
-    <div id="over-overlay" class="overlay" style="display: none;">
-        <h1 style="color:#ff4757; font-size: 40px;">你被素頭了！</h1>
-        <p id="final-score" style="font-size: 24px;"></p>
-        <button class="btn" onclick="resetGame(event)">再挑戰一次</button>
-    </div>
-
-    <script>
-        let angle = 0;
-        let speed = 2.5;
-        let direction = 1;
-        let score = 0;
-        let isPlaying = false;
-        
-        const img = document.getElementById('calvin-img');
-        const scoreDisplay = document.getElementById('score-board');
-        const guideOverlay = document.getElementById('guide-overlay');
-        const overOverlay = document.getElementById('over-overlay');
-        const finalScore = document.getElementById('final-score');
-
-        function gameLoop() {
-            if (!isPlaying) return;
-
-            // 1. 更新旋轉
-            angle += speed * direction;
-            img.style.transform = `rotate(${angle}deg)`;
-
-            // 2. 判斷失敗條件 (頭部指向 165deg ~ 195deg)
-            let currentAngle = ((angle % 360) + 360) % 360;
-            if (currentAngle > 165 && currentAngle < 195) {
-                gameOver();
-            }
-
-            // 3. 增加難度：多樣化模式
-            score += 0.05;
-            scoreDisplay.innerText = `分數: ${Math.floor(score)}`;
-            
-            // 隨機變速與隨機反向 (分數越高機率越高)
-            if (Math.random() < 0.005) {
-                speed = 2.5 + (score / 50); // 隨分數提速
-                if (score > 100 && Math.random() < 0.3) direction *= -1; // 隨機反轉
-            }
-
-            requestAnimationFrame(gameLoop);
-        }
-
-        // 簡化操作：撥開頭部
-        function handleDefense() {
-            if (!isPlaying) return;
-            
-            // 點擊效果：瞬間推開 120 度
-            angle -= (direction * 120); 
-            img.style.filter = "brightness(1.8) contrast(1.2)";
-            setTimeout(() => img.style.filter = "none", 100);
-            
-            // 每次成功撥開給予額外加分
-            score += 5;
-        }
-
-        function startGame(e) {
-            e.stopPropagation();
-            guideOverlay.style.display = 'none';
-            isPlaying = true;
-            gameLoop();
-        }
-
-        function gameOver() {
-            isPlaying = false;
-            finalScore.innerText = `最終防禦分數: ${Math.floor(score)}`;
-            overOverlay.style.display = 'flex';
-        }
-
-        function resetGame(e) {
-            e.stopPropagation();
-            angle = 0;
-            score = 0;
-            speed = 2.5;
-            direction = 1;
-            overOverlay.style.display = 'none';
-            isPlaying = true;
-            gameLoop();
-        }
-    </script>
-</body>
-</html>
-            height: 20px;
-            background: red;
-            left: 100px;
-            filter: blur(10px);
-            opacity: 0.5;
-        }
-        #ui {
-            position: absolute;
-            top: 20px;
-            text-align: center;
-        }
-        .msg {
-            font-size: 24px;
-            font-weight: bold;
-            margin-bottom: 10px;
-        }
-        #retry-btn {
-            display: none;
-            padding: 10px 20px;
-            background: #ff4757;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            font-size: 18px;
-        }
-    </style>
-</head>
-<body onclick="handleClick()">
-
-    <div id="ui">
-        <div class="msg" id="score">分數: 0</div>
-        <div class="msg" id="status">別讓喀爾文對準你！</div>
-        <button id="retry-btn" onclick="resetGame(event)">再挑戰一次</button>
-    </div>
-
-    <div id="game-container">
-        <img id="calvin-img" src="12672.jpg" alt="Calvin">
-        <div id="warning-zone"></div>
-    </div>
-
-    <script>
-        let angle = 0;
-        let speed = 2;
-        let direction = 1;
-        let score = 0;
-        let isGameOver = false;
-        const img = document.getElementById('calvin-img');
-        const scoreDisplay = document.getElementById('score');
-        const statusDisplay = document.getElementById('status');
-        const retryBtn = document.getElementById('retry-btn');
-
-        function gameLoop() {
-            if (isGameOver) return;
-
-            // 增加角度
-            angle += speed * direction;
-            img.style.transform = `rotate(${angle}deg)`;
-
-            // 檢查角度：如果頭部（原本的上方）轉到 150~210 度之間（正下方區域）
-            let normalizedAngle = ((angle % 360) + 360) % 360;
-            
-            if (normalizedAngle > 160 && normalizedAngle < 200) {
-                endGame();
-            }
-
-            // 增加難度與分數
-            score += 0.1;
-            scoreDisplay.innerText = `分數: ${Math.floor(score)}`;
-            speed += 0.002; // 越來越快
-
-            requestAnimationFrame(gameLoop);
-        }
-
-        function handleClick() {
-            if (isGameOver) return;
-            // 點擊後反向旋轉，並加速
-            direction *= -1;
-            speed += 0.1;
-            img.style.filter = "brightness(1.5)";
-            setTimeout(() => img.style.filter = "brightness(1)", 100);
-        }
-
-        function endGame() {
-            isGameOver = true;
-            statusDisplay.innerText = "你被「素頭」了！";
-            statusDisplay.style.color = "#ff4757";
-            retryBtn.style.display = "block";
-            img.style.boxShadow = "0 0 50px red";
-        }
-
-        function resetGame(e) {
-            e.stopPropagation(); // 防止觸發 handleClick
-            angle = 0;
-            speed = 2;
-            direction = 1;
-            score = 0;
-            isGameOver = false;
-            statusDisplay.innerText = "別讓喀爾文對準你！";
-            statusDisplay.style.color = "white";
-            retryBtn.style.display = "none";
-            img.style.boxShadow = "0 0 20px rgba(255,255,255,0.2)";
-            gameLoop();
-        }
-
-        // 啟動遊戲
-        gameLoop();
     </script>
 </body>
 </html>
